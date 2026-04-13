@@ -11,7 +11,8 @@ import {
   Target,
   Flag,
   Check,
-  ChevronRight
+  ChevronRight,
+  Trash2
 } from 'lucide-react';
 
 const LOCAL_STORAGE_KEY = 'golf_tracker_rounds';
@@ -35,12 +36,7 @@ export default function App() {
         setCourses(JSON.parse(savedCourses)); 
       } catch (e) {}
     } else {
-      // Setup some default courses with basic pars if none exist
-      const default18 = Array(18).fill(4); // lazy default
-      setCourses([
-        { name: 'Pleasantville Country Club', pars: Array(18).fill(4) },
-        { name: 'Walkill Golf Club', pars: Array(18).fill(4) },
-      ]);
+      setCourses([]);
     }
   }, []);
 
@@ -189,14 +185,29 @@ function NewRoundWrapper({ courses, onSaveRound, onSaveCourse }) {
                </div>
             )}
             
-            {/* Show an Edit button if they selected a course so they can update its pars */}
+            {/* Show an Edit & Delete button if they selected a course so they can update its pars */}
             {matchedCourse && (
-              <button 
-                onClick={() => setConfiguringCourse(true)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#006747] hover:text-[#007a54] bg-[#006747]/10 px-3 py-1.5 rounded-lg active:scale-95 transition-all"
-              >
-                Edit Pars
-              </button>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                <button 
+                  onClick={() => setConfiguringCourse(true)}
+                  className="text-xs font-bold text-[#006747] hover:text-[#007a54] bg-[#006747]/10 px-3 py-1.5 rounded-lg active:scale-95 transition-all"
+                >
+                  Edit Option
+                </button>
+                <button
+                  onClick={() => {
+                    if(window.confirm(`Remove ${matchedCourse.name} from your local registry?`)) {
+                      const newC = courses.filter(c => c.name !== matchedCourse.name);
+                      localStorage.setItem(LOCAL_STORAGE_COURSES, JSON.stringify(newC));
+                      window.location.reload();
+                    }
+                  }}
+                  className="p-1.5 text-red-500 hover:bg-red-500/10 rounded-lg active:scale-95 transition-all shrink-0"
+                  aria-label="Delete Course"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             )}
           </div>
 
