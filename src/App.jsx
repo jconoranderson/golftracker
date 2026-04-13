@@ -379,7 +379,8 @@ function HoleByHoleTracker({ course, date, initialRoundId, initialHoleData, onSa
       putts,
       fairwaysHit,
       girsHit,
-      holeData: holes // Save granular data for future if requested!
+      segmentPlayed: activeSegment, // '18', 'front9', 'back9'
+      holeData: holes 
     });
   };
 
@@ -507,6 +508,8 @@ function CompactStepper({ label, value, onChange, highlight = "text-white" }) {
 }
 
 function StatsDashboard({ rounds }) {
+  const [statsView, setStatsView] = useState('18'); // '18' or '9'
+
   if (!rounds.length) {
     return (
       <div className="text-center py-20 animate-in fade-in">
@@ -519,18 +522,47 @@ function StatsDashboard({ rounds }) {
     );
   }
 
-  const avgScore = (rounds.reduce((sum, r) => sum + r.score, 0) / rounds.length).toFixed(1);
-  const avgPutts = (rounds.reduce((sum, r) => sum + r.putts, 0) / rounds.length).toFixed(1);
-  
-  const totalGirs = rounds.reduce((sum, r) => sum + r.girsHit, 0);
-  const girPercentage = ((totalGirs / (rounds.length * 18)) * 100).toFixed(1);
+  // Derive if a round is 9 or 18 holes for backwards compatibility
+  const getRoundType = (r) => {
+    if (r.segmentPlayed) {
+      return (r.segmentPlayed === 'front9' || r.segmentPlayed === 'back9') ? '9' : '18';
+    }
+    // Safe heuristic: Nobody using this is shooting < 55 on 18 holes
+    return r.score < 55 ? '9' : '18';
+  };
 
-  // Note: Total fairways varies per course, but typically 14
-  const totalFairways = rounds.reduce((sum, r) => sum + r.fairwaysHit, 0);
-  const fairwayPercentage = ((totalFairways / (rounds.length * 14)) * 100).toFixed(1);
+  const filteredRounds = rounds.filter(r => getRoundType(r) === statsView);
+
+  const avgScore = filteredRounds.length ? (filteredRounds.reduce((sum, r) => sum + r.score, 0) / filteredRounds.length).toFixed(1) : '-';
+  const avgPutts = filteredRounds.length ? (filteredRounds.reduce((sum, r) => sum + r.putts, 0) / filteredRounds.length).toFixed(1) : '-';
+  
+  const totalGirs = filteredRounds.reduce((sum, r) => sum + r.girsHit, 0);
+  const holesMultiplier = statsView === '18' ? 18 : 9;
+  const girPercentage = filteredRounds.length ? ((totalGirs / (filteredRounds.length * holesMultiplier)) * 100).toFixed(1) : '-';
+
+  // Total fairways varies per course, but typically 14 on an 18, 7 on a 9
+  const totalFairways = filteredRounds.reduce((sum, r) => sum + r.fairwaysHit, 0);
+  const fairwaysMultiplier = statsView === '18' ? 14 : 7;
+  const fairwayPercentage = filteredRounds.length ? ((totalFairways / (filteredRounds.length * fairwaysMultiplier)) * 100).toFixed(1) : '-';
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
+
+      {/* Segmented Control for Stats */}
+      <div className="bg-slate-900 border border-slate-800 p-1.5 rounded-xl flex gap-1 shadow-inner">
+        <button 
+          onClick={() => setStatsView('9')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${statsView === '9' ? 'bg-[#006747] text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+        >
+          9-Hole Stats
+        </button>
+        <button 
+          onClick={() => setStatsView('18')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${statsView === '18' ? 'bg-[#006747] text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+        >
+          18-Hole Stats
+        </button>
+      </div>
       
       {/* Main Stat Card */}
       <div className="bg-gradient-to-br from-[#006747] to-[#004d35] rounded-3xl p-6 shadow-xl relative overflow-hidden">
@@ -565,8 +597,8 @@ function StatsDashboard({ rounds }) {
         
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Total Rounds</div>
-            <div className="text-xl font-bold text-white">{rounds.length}</div>
+            <div className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Total {statsView}-Hole Rounds</div>
+            <div className="text-xl font-bold text-white">{filteredRounds.length}</div>
           </div>
           <Activity className="w-8 h-8 text-[#006747]/50" />
         </div>
@@ -579,8 +611,8 @@ function StatsDashboard({ rounds }) {
           Recent Scores
         </h3>
         <div className="flex items-end justify-between h-24 gap-2">
-          {rounds.slice(0, 7).reverse().map((r, i) => {
-            const height = Math.max(10, Math.min(100, 100 - (r.score - 70) * 1.5));
+          {filteredRounds.slice(0, 7).reverse().map((r, i) => {
+            const height = Math.max(10, Math.min(100, 100 - (r.score - (statsView === '18' ? 70 : 35)) * (statsView === '18' ? 1.5 : 3)));
             return (
               <div key={i} className="flex flex-col items-center flex-1 gap-2">
                 <div 
