@@ -305,10 +305,10 @@ function HoleByHoleTracker({ course, date, onSaveRound }) {
   const [holes, setHoles] = useState(
     course.pars.map((par) => ({
       par: par,
-      shots: par, // default to par
-      putts: 2,   // default 2 putts
-      fairway: par > 3 ? true : null, // par 3s don't have fairways typically
-      gir: true,  // default to hitting the green
+      shots: 0,   // default to 0
+      putts: 0,   // default to 0
+      fairway: par > 3 ? false : null, // default to false
+      gir: false, // default to false
     }))
   );
 
