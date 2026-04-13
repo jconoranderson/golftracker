@@ -7,23 +7,19 @@ import {
   Minus, 
   List, 
   Activity, 
-  Download, 
-  Target,
-  Flag,
-  Check,
-  ChevronRight,
   Trash2,
   Cloud,
   UploadCloud,
   DownloadCloud,
-  Save
+  Save,
+  Pencil
 } from 'lucide-react';
 
 const LOCAL_STORAGE_KEY = 'golf_tracker_rounds';
 const LOCAL_STORAGE_COURSES = 'golf_tracker_courses';
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState('new'); // new, stats, history
+  const [activeTab, setActiveTab] = useState('new'); // new, stats, history, sync
+  const [editingRoundId, setEditingRoundId] = useState(null);
   const [rounds, setRounds] = useState([]);
   const [courses, setCourses] = useState([]);
 
@@ -53,8 +49,13 @@ export default function App() {
     localStorage.setItem(LOCAL_STORAGE_COURSES, JSON.stringify(courses));
   }, [courses]);
 
-  const addRound = (round) => {
-    setRounds([round, ...rounds].sort((a, b) => new Date(b.date) - new Date(a.date)));
+  const saveRound = (round) => {
+    if (editingRoundId) {
+      setRounds(rounds.map(r => r.id === round.id ? round : r).sort((a, b) => new Date(b.date) - new Date(a.date)));
+      setEditingRoundId(null);
+    } else {
+      setRounds([round, ...rounds].sort((a, b) => new Date(b.date) - new Date(a.date)));
+    }
     setActiveTab('stats');
   };
 
@@ -99,16 +100,30 @@ export default function App() {
       </header>
 
       <main className="flex-1 max-w-md mx-auto w-full p-4 space-y-6">
-        {activeTab === 'new' && <NewRoundWrapper courses={courses} onSaveRound={addRound} onSaveCourse={addCourse} />}
+        {activeTab === 'new' && (
+          <NewRoundWrapper 
+            key={editingRoundId || 'new'} 
+            initialRound={rounds.find(r => r.id === editingRoundId)}
+            courses={courses} 
+            onSaveRound={saveRound} 
+            onSaveCourse={addCourse} 
+          />
+        )}
         {activeTab === 'stats' && <StatsDashboard rounds={rounds} />}
-        {activeTab === 'history' && <History rounds={rounds} onDeleteRound={deleteRound} />}
+        {activeTab === 'history' && (
+          <History 
+            rounds={rounds} 
+            onDeleteRound={deleteRound} 
+            onEditRound={(id) => { setEditingRoundId(id); setActiveTab('new'); }} 
+          />
+        )}
         {activeTab === 'sync' && <CloudSync rounds={rounds} courses={courses} onSync={(r, c) => { setRounds(r); setCourses(c); setActiveTab('stats'); }} />}
       </main>
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-800 z-50">
         <div className="max-w-md mx-auto flex justify-around p-2">
-          <NavButton icon={<Plus className="w-6 h-6" />} label="New" active={activeTab === 'new'} onClick={() => setActiveTab('new')} />
+          <NavButton icon={<Plus className="w-6 h-6" />} label="New" active={activeTab === 'new'} onClick={() => { setEditingRoundId(null); setActiveTab('new'); }} />
           <NavButton icon={<Activity className="w-6 h-6" />} label="Stats" active={activeTab === 'stats'} onClick={() => setActiveTab('stats')} />
           <NavButton icon={<List className="w-6 h-6" />} label="History" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />
           <NavButton icon={<Cloud className="w-6 h-6" />} label="Sync" active={activeTab === 'sync'} onClick={() => setActiveTab('sync')} />
@@ -127,9 +142,9 @@ function NavButton({ icon, label, active, onClick }) {
   );
 }
 
-function NewRoundWrapper({ courses, onSaveRound, onSaveCourse }) {
-  const [courseName, setCourseName] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+function NewRoundWrapper({ courses, initialRound, onSaveRound, onSaveCourse }) {
+  const [courseName, setCourseName] = useState(initialRound?.courseName || '');
+  const [date, setDate] = useState(initialRound?.date || new Date().toISOString().split('T')[0]);
   const [configuringCourse, setConfiguringCourse] = useState(false);
 
   const matchedCourse = courses.find(c => c.name.toLowerCase() === courseName.toLowerCase());
@@ -236,7 +251,13 @@ function NewRoundWrapper({ courses, onSaveRound, onSaveCourse }) {
         </div>
 
         {matchedCourse ? (
-          <HoleByHoleTracker course={matchedCourse} date={date} onSaveRound={onSaveRound} />
+          <HoleByHoleTracker 
+            course={matchedCourse} 
+            date={date} 
+            initialRoundId={initialRound?.id}
+            initialHoleData={initialRound?.holeData}
+            onSaveRound={onSaveRound} 
+          />
         ) : (
           <div className="text-center p-6 border-2 border-dashed border-slate-800 rounded-2xl bg-slate-950/50 text-slate-500">
             <MapPin className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -310,10 +331,10 @@ function AddCourseForm({ initialName, initialPars, onSave, onCancel }) {
   );
 }
 
-function HoleByHoleTracker({ course, date, onSaveRound }) {
+function HoleByHoleTracker({ course, date, initialRoundId, initialHoleData, onSaveRound }) {
   // Initialize hole data based on the course pars
   const [holes, setHoles] = useState(
-    course.pars.map((par) => ({
+    initialHoleData || course.pars.map((par) => ({
       par: par,
       shots: 0,   // default to 0
       putts: 0,   // default to 0
@@ -351,7 +372,7 @@ function HoleByHoleTracker({ course, date, onSaveRound }) {
     const girsHit = activeData.filter(h => h.gir === true).length;
 
     onSaveRound({
-      id: Date.now().toString(),
+      id: initialRoundId || Date.now().toString(),
       courseName: course.name,
       date,
       score,
@@ -577,7 +598,7 @@ function StatsDashboard({ rounds }) {
   );
 }
 
-function History({ rounds, onDeleteRound }) {
+function History({ rounds, onDeleteRound, onEditRound }) {
   if (!rounds.length) {
     return (
       <div className="text-center py-20 animate-in fade-in">
@@ -609,6 +630,13 @@ function History({ rounds, onDeleteRound }) {
           <div className="flex items-center gap-3">
             <div className="text-2xl font-black tabular-nums text-[#006747]">{round.score}</div>
             <div className="w-px h-8 bg-slate-800 hidden sm:block"></div>
+            <button 
+              onClick={() => onEditRound(round.id)}
+              className="p-2 text-slate-500/50 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all active:scale-95"
+              aria-label="Edit round"
+            >
+              <Pencil className="w-5 h-5"/>
+            </button>
             <button 
               onClick={() => {
                 if (window.confirm(`Delete your round at ${round.courseName}?`)) onDeleteRound(round.id);
