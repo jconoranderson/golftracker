@@ -1,16 +1,58 @@
-# React + Vite
+# 🏌️‍♂️ GolfTracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A mobile-first, high-performance web application to track your personal golf rounds built with React, Vite, and Tailwind CSS. 
 
-Currently, two official plugins are available:
+![Screenshot Placeholder](public/favicon.svg) <!-- Replace with an actual screenshot! -->
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## ✨ Features
 
-## React Compiler
+- **Mobile First Design**: A fluid UI crafted for thumb accessibility while out on the course.
+- **Premium Aesthetics**: Defaults to a sleek dark mode highlighted with classic Masters Green accents.
+- **Detailed Stat Tracking**: Track your total score, putts, fairways hit, and Greens in Regulation (GIR) per round using ergonomic steppers and toggle pills.
+- **Dashboard Analysis**: Instantly visualize your Average Score, Putting Average, and active GIR percentage. Includes a trend graph of your recent scores.
+- **Private Data Storage**: Your rounds are saved securely to your device's Local Storage. No internet connection required!
+- **Data Portability**: Click "Export to JSON" on the Stats page to pull raw data for Python/R analytics down the road.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🚀 Tech Stack
 
-## Expanding the ESLint configuration
+- **Framework**: [React 19](https://react.dev/) + [Vite](https://vitejs.dev/)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
+- **Icons**: [Lucide React](https://lucide.dev/)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 🛠️ Getting Started
+
+### Prerequisites
+Make sure you have [Node.js](https://nodejs.org/) installed on your machine.
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/jconoranderson/golftracker.git
+   cd golftracker
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Start the local development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Open your browser and navigate to `http://localhost:5173`.
+
+## 📦 Building for Production
+
+To create a production-ready build:
+
+```bash
+npm run build
+```
+
+This will output optimized, minified files directly into the `/dist` directory.
+
+---
+*Built with ❤️ for precision out on the fairway.*
