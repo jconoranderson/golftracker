@@ -312,18 +312,33 @@ function HoleByHoleTracker({ course, date, onSaveRound }) {
     }))
   );
 
+  const [activeSegment, setActiveSegment] = useState('18'); // '18', 'front9', 'back9'
+
   const updateHole = (index, field, value) => {
     const newHoles = [...holes];
     newHoles[index] = { ...newHoles[index], [field]: value };
     setHoles(newHoles);
   };
 
+  const getActiveHolesList = () => {
+    if (activeSegment === 'front9') return holes.slice(0, 9);
+    if (activeSegment === 'back9') return holes.slice(9, 18);
+    return holes;
+  };
+
+  const getActiveParsList = () => {
+    if (activeSegment === 'front9') return course.pars.slice(0, 9);
+    if (activeSegment === 'back9') return course.pars.slice(9, 18);
+    return course.pars;
+  };
+
   const handleSave = () => {
+    const activeData = getActiveHolesList();
     // Derive totals
-    const score = holes.reduce((sum, h) => sum + h.shots, 0);
-    const putts = holes.reduce((sum, h) => sum + h.putts, 0);
-    const fairwaysHit = holes.filter(h => h.fairway === true).length;
-    const girsHit = holes.filter(h => h.gir === true).length;
+    const score = activeData.reduce((sum, h) => sum + h.shots, 0);
+    const putts = activeData.reduce((sum, h) => sum + h.putts, 0);
+    const fairwaysHit = activeData.filter(h => h.fairway === true).length;
+    const girsHit = activeData.filter(h => h.gir === true).length;
 
     onSaveRound({
       id: Date.now().toString(),
@@ -340,22 +355,47 @@ function HoleByHoleTracker({ course, date, onSaveRound }) {
   return (
     <div className="space-y-6 pt-4 border-t border-slate-800">
       
+      {/* Segmented Control for 9 vs 18 holes */}
+      <div className="bg-slate-900 border border-slate-800 p-1.5 rounded-xl flex gap-1 shadow-inner">
+        <button 
+          onClick={() => setActiveSegment('front9')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeSegment === 'front9' ? 'bg-[#006747] text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+        >
+          Front 9
+        </button>
+        <button 
+          onClick={() => setActiveSegment('back9')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeSegment === 'back9' ? 'bg-[#006747] text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+        >
+          Back 9
+        </button>
+        <button 
+          onClick={() => setActiveSegment('18')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeSegment === '18' ? 'bg-[#006747] text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+        >
+          18 Holes
+        </button>
+      </div>
+
       {/* Sticky header for current totals */}
       <div className="sticky top-20 z-10 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl p-4 shadow-lg flex justify-between items-center">
         <div>
           <div className="text-[10px] uppercase font-bold text-slate-400">Total Score</div>
-          <div className="text-2xl font-black text-[#006747] leading-none">{holes.reduce((a,b)=>a+b.shots, 0)}</div>
+          <div className="text-2xl font-black text-[#006747] leading-none">{getActiveHolesList().reduce((a,b)=>a+b.shots, 0)}</div>
         </div>
         <div>
           <div className="text-[10px] uppercase font-bold text-slate-400 text-right">To Par</div>
           <div className="text-xl font-bold text-white leading-none">
-            {holes.reduce((a,b)=>a+b.shots, 0) - course.pars.reduce((a,b)=>a+b, 0) > 0 ? '+' : ''}{holes.reduce((a,b)=>a+b.shots, 0) - course.pars.reduce((a,b)=>a+b, 0)}
+            {getActiveHolesList().reduce((a,b)=>a+b.shots, 0) - getActiveParsList().reduce((a,b)=>a+b, 0) > 0 ? '+' : ''}{getActiveHolesList().reduce((a,b)=>a+b.shots, 0) - getActiveParsList().reduce((a,b)=>a+b, 0)}
           </div>
         </div>
       </div>
 
       <div className="space-y-4">
-        {holes.map((hole, i) => (
+        {holes.map((hole, i) => {
+          if (activeSegment === 'front9' && i >= 9) return null;
+          if (activeSegment === 'back9' && i < 9) return null;
+          return (
           <div key={i} className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-inner">
             <div className="bg-slate-900 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
               <span className="font-bold text-sm text-white flex items-center gap-2">
@@ -406,7 +446,8 @@ function HoleByHoleTracker({ course, date, onSaveRound }) {
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <button 
