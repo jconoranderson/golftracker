@@ -12,7 +12,11 @@ import {
   Flag,
   Check,
   ChevronRight,
-  Trash2
+  Trash2,
+  Cloud,
+  UploadCloud,
+  DownloadCloud,
+  Save
 } from 'lucide-react';
 
 const LOCAL_STORAGE_KEY = 'golf_tracker_rounds';
@@ -94,6 +98,7 @@ export default function App() {
         {activeTab === 'new' && <NewRoundWrapper courses={courses} onSaveRound={addRound} onSaveCourse={addCourse} />}
         {activeTab === 'stats' && <StatsDashboard rounds={rounds} />}
         {activeTab === 'history' && <History rounds={rounds} />}
+        {activeTab === 'sync' && <CloudSync rounds={rounds} courses={courses} onSync={(r, c) => { setRounds(r); setCourses(c); setActiveTab('stats'); }} />}
       </main>
 
       {/* Bottom Navigation */}
@@ -102,6 +107,7 @@ export default function App() {
           <NavButton icon={<Plus className="w-6 h-6" />} label="New" active={activeTab === 'new'} onClick={() => setActiveTab('new')} />
           <NavButton icon={<Activity className="w-6 h-6" />} label="Stats" active={activeTab === 'stats'} onClick={() => setActiveTab('stats')} />
           <NavButton icon={<List className="w-6 h-6" />} label="History" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />
+          <NavButton icon={<Cloud className="w-6 h-6" />} label="Sync" active={activeTab === 'sync'} onClick={() => setActiveTab('sync')} />
         </div>
       </nav>
     </div>
@@ -601,6 +607,150 @@ function History({ rounds }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function CloudSync({ rounds, courses, onSync }) {
+  const [pat, setPat] = useState(localStorage.getItem('golf_tracker_pat') || '');
+  const [gistId, setGistId] = useState(localStorage.getItem('golf_tracker_gist_id') || '');
+  const [loading, setLoading] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const saveSettings = () => {
+    localStorage.setItem('golf_tracker_pat', pat);
+    localStorage.setItem('golf_tracker_gist_id', gistId);
+    setSuccess('Settings saved locally.');
+    setTimeout(() => setSuccess(''), 3000);
+  };
+
+  const handlePush = async () => {
+    if (!pat) return setError("Missing GitHub PAT");
+    setLoading('pushing');
+    setError(''); setSuccess('');
+    
+    const syncState = JSON.stringify({ rounds, courses }, null, 2);
+
+    try {
+      if (gistId) {
+        const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${pat}`, Accept: 'application/vnd.github.v3+json' },
+          body: JSON.stringify({ files: { "golftracker_sync.json": { content: syncState } } })
+        });
+        if (!res.ok) throw new Error("Failed to update Cloud Database.");
+        setSuccess("Successfully backed up to Cloud!");
+      } else {
+        const res = await fetch(`https://api.github.com/gists`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${pat}`, Accept: 'application/vnd.github.v3+json' },
+          body: JSON.stringify({
+            description: "GolfTracker Cloud Database",
+            public: false,
+            files: { "golftracker_sync.json": { content: syncState } }
+          })
+        });
+        if (!res.ok) throw new Error("Failed to create Cloud Database.");
+        const data = await res.json();
+        setGistId(data.id);
+        localStorage.setItem('golf_tracker_gist_id', data.id);
+        setSuccess("Cloud Database generated and synced!");
+      }
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading('');
+  };
+
+  const handlePull = async () => {
+    if (!pat || !gistId) return setError("Missing PAT or Database ID");
+    setLoading('pulling');
+    setError(''); setSuccess('');
+    try {
+      const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+        headers: { Authorization: `Bearer ${pat}`, Accept: 'application/vnd.github.v3+json' },
+      });
+      if (!res.ok) throw new Error("Failed to retrieve Cloud Database.");
+      const data = await res.json();
+      const content = data.files["golftracker_sync.json"].content;
+      const parsed = JSON.parse(content);
+      onSync(parsed.rounds || [], parsed.courses || []);
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading('');
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-800 space-y-6">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-2">
+            <Cloud className="w-6 h-6 text-[#006747]" /> Cloud Sync
+          </h2>
+          <p className="text-sm text-slate-400">
+            Sync your golf rounds across your phone and laptop using a secret GitHub Gist database.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">GitHub Personal Access Token</label>
+            <input 
+              type="password" 
+              value={pat}
+              onChange={(e) => setPat(e.target.value)}
+              placeholder="ghp_****************"
+              className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#006747] focus:border-transparent transition-all font-mono text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Cloud Database ID (Gist ID)</label>
+            <input 
+              type="text" 
+              value={gistId}
+              onChange={(e) => setGistId(e.target.value)}
+              placeholder="Leave blank to generate a new one..."
+              className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#006747] focus:border-transparent transition-all font-mono text-sm"
+            />
+          </div>
+
+          <button 
+            onClick={saveSettings}
+            className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all text-sm"
+          >
+            <Save className="w-4 h-4" /> Save Configuration
+          </button>
+        </div>
+
+        <div className="h-px bg-slate-800 w-full" />
+
+        <div className="grid grid-cols-2 gap-4">
+          <button 
+            onClick={handlePush}
+            disabled={loading !== ''}
+            className="bg-[#006747] hover:bg-[#007a54] text-white font-bold py-4 rounded-xl shadow-lg flex flex-col items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100"
+          >
+            <UploadCloud className={`w-6 h-6 ${loading === 'pushing' ? 'animate-bounce' : ''}`} />
+            <span className="text-sm">Push to Cloud</span>
+          </button>
+
+          <button 
+            onClick={handlePull}
+            disabled={loading !== ''}
+            className="bg-sky-600 hover:bg-sky-500 text-white font-bold py-4 rounded-xl shadow-lg flex flex-col items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100"
+          >
+            <DownloadCloud className={`w-6 h-6 ${loading === 'pulling' ? 'animate-bounce' : ''}`} />
+            <span className="text-sm">Pull from Cloud</span>
+          </button>
+        </div>
+
+        {error && <div className="p-3 bg-red-900/50 border border-red-500/50 text-red-200 text-sm rounded-xl text-center">{error}</div>}
+        {success && <div className="p-3 bg-[#006747]/20 border border-[#006747]/50 text-emerald-400 font-bold text-sm rounded-xl text-center flex items-center justify-center gap-2"><Check className="w-4 h-4"/>{success}</div>}
+
+      </div>
     </div>
   );
 }
