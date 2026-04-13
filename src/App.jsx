@@ -58,6 +58,10 @@ export default function App() {
     setActiveTab('stats');
   };
 
+  const deleteRound = (id) => {
+    setRounds(rounds.filter(r => r.id !== id));
+  };
+
   const addCourse = (courseConfig) => {
     setCourses([...courses, courseConfig]);
   };
@@ -97,7 +101,7 @@ export default function App() {
       <main className="flex-1 max-w-md mx-auto w-full p-4 space-y-6">
         {activeTab === 'new' && <NewRoundWrapper courses={courses} onSaveRound={addRound} onSaveCourse={addCourse} />}
         {activeTab === 'stats' && <StatsDashboard rounds={rounds} />}
-        {activeTab === 'history' && <History rounds={rounds} />}
+        {activeTab === 'history' && <History rounds={rounds} onDeleteRound={deleteRound} />}
         {activeTab === 'sync' && <CloudSync rounds={rounds} courses={courses} onSync={(r, c) => { setRounds(r); setCourses(c); setActiveTab('stats'); }} />}
       </main>
 
@@ -573,7 +577,7 @@ function StatsDashboard({ rounds }) {
   );
 }
 
-function History({ rounds }) {
+function History({ rounds, onDeleteRound }) {
   if (!rounds.length) {
     return (
       <div className="text-center py-20 animate-in fade-in">
@@ -590,7 +594,7 @@ function History({ rounds }) {
     <div className="space-y-3 animate-in fade-in duration-300">
       <h2 className="text-lg font-bold text-slate-100 mb-4 px-2">Past Rounds</h2>
       {rounds.map((round) => (
-        <div key={round.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center shadow-sm hover:bg-slate-800/80 transition-colors active:scale-[0.98]">
+        <div key={round.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center shadow-sm transition-colors">
           <div className="flex-1 min-w-0">
             <h3 className="text-white font-bold truncate text-base mb-1">{round.courseName}</h3>
             <div className="flex items-center gap-3 text-xs text-slate-400">
@@ -602,8 +606,18 @@ function History({ rounds }) {
               <span>Putts: {round.putts}</span>
             </div>
           </div>
-          <div className="ml-4 flex flex-col items-end">
+          <div className="flex items-center gap-3">
             <div className="text-2xl font-black tabular-nums text-[#006747]">{round.score}</div>
+            <div className="w-px h-8 bg-slate-800 hidden sm:block"></div>
+            <button 
+              onClick={() => {
+                if (window.confirm(`Delete your round at ${round.courseName}?`)) onDeleteRound(round.id);
+              }}
+              className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all active:scale-95"
+              aria-label="Delete round"
+            >
+              <Trash2 className="w-5 h-5"/>
+            </button>
           </div>
         </div>
       ))}
