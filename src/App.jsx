@@ -132,7 +132,7 @@ function NewRoundForm({ onSave, rounds }) {
   
   // Extract unique courses from previous rounds
   const pastCourses = Array.from(new Set(rounds.map(r => r.courseName)));
-  const defaultCourses = ['Augusta National', 'Pebble Beach', 'St Andrews', 'Pinehurst No. 2', 'Bethpage Black', 'TPC Sawgrass', 'Torrey Pines', 'Oakmont'];
+  const defaultCourses = ['Pleasantville Country Club', 'Augusta National', 'Pebble Beach', 'St Andrews', 'Pinehurst No. 2', 'Bethpage Black', 'TPC Sawgrass', 'Torrey Pines', 'Oakmont'];
   const allCourses = Array.from(new Set([...pastCourses, ...defaultCourses]));
   
   // Fairways out of 14, GIR out of 18 (using simple steppers with +/-)
