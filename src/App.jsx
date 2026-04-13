@@ -133,11 +133,19 @@ function NewRoundWrapper({ courses, onSaveRound, onSaveCourse }) {
     return (
       <AddCourseForm 
         initialName={courseName} 
+        initialPars={matchedCourse ? matchedCourse.pars : null}
         onCancel={() => setConfiguringCourse(false)}
         onSave={(c) => {
-          onSaveCourse(c);
+          // If overwriting existing course, filter it out first
+          const newCourses = courses.filter(xc => xc.name.toLowerCase() !== c.name.toLowerCase());
+          newCourses.push(c);
+          localStorage.setItem(LOCAL_STORAGE_COURSES, JSON.stringify(newCourses));
+          // Because state might be delayed, we can reload or call onSaveCourse which updates parent state:
+          // Wait, onSaveCourse appends. Let's make an onUpdateCourses
+          
           setCourseName(c.name);
           setConfiguringCourse(false);
+          window.location.reload(); // Simple brute force to reload latest from local storage 
         }} 
       />
     );
@@ -161,7 +169,6 @@ function NewRoundWrapper({ courses, onSaveRound, onSaveCourse }) {
               />
             </div>
             
-            {/* Searchable Dropdown List */}
             {courseName.length > 0 && !matchedCourse && (
                <div className="absolute z-20 w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden max-h-56 overflow-y-auto">
                  {courses.filter(c => c.name.toLowerCase().includes(courseName.toLowerCase())).map(course => (
@@ -180,6 +187,16 @@ function NewRoundWrapper({ courses, onSaveRound, onSaveCourse }) {
                    <Plus className="w-4 h-4" /> Add "{courseName}" to Registry
                  </button>
                </div>
+            )}
+            
+            {/* Show an Edit button if they selected a course so they can update its pars */}
+            {matchedCourse && (
+              <button 
+                onClick={() => setConfiguringCourse(true)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#006747] hover:text-[#007a54] bg-[#006747]/10 px-3 py-1.5 rounded-lg active:scale-95 transition-all"
+              >
+                Edit Pars
+              </button>
             )}
           </div>
 
@@ -210,9 +227,9 @@ function NewRoundWrapper({ courses, onSaveRound, onSaveCourse }) {
   );
 }
 
-function AddCourseForm({ initialName, onSave, onCancel }) {
+function AddCourseForm({ initialName, initialPars, onSave, onCancel }) {
   const [name, setName] = useState(initialName);
-  const [pars, setPars] = useState(Array(18).fill(4)); // default all par 4s
+  const [pars, setPars] = useState(initialPars || Array(18).fill(4));
 
   const handleParChange = (index, delta) => {
     const newPars = [...pars];
