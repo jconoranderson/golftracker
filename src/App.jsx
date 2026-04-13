@@ -8,26 +8,39 @@ import {
   List, 
   Activity, 
   Download, 
-  ChevronRight,
   Target,
-  Flag
+  Flag,
+  Check,
+  ChevronRight
 } from 'lucide-react';
 
 const LOCAL_STORAGE_KEY = 'golf_tracker_rounds';
+const LOCAL_STORAGE_COURSES = 'golf_tracker_courses';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('new'); // new, stats, history
   const [rounds, setRounds] = useState([]);
+  const [courses, setCourses] = useState([]);
 
   // Load from local storage
   useEffect(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) {
-      try {
-        setRounds(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse rounds", e);
-      }
+    const savedRounds = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedRounds) {
+      try { setRounds(JSON.parse(savedRounds)); } catch (e) {}
+    }
+
+    const savedCourses = localStorage.getItem(LOCAL_STORAGE_COURSES);
+    if (savedCourses) {
+      try { 
+        setCourses(JSON.parse(savedCourses)); 
+      } catch (e) {}
+    } else {
+      // Setup some default courses with basic pars if none exist
+      const default18 = Array(18).fill(4); // lazy default
+      setCourses([
+        { name: 'Pleasantville Country Club', pars: Array(18).fill(4) },
+        { name: 'Walkill Golf Club', pars: Array(18).fill(4) },
+      ]);
     }
   }, []);
 
@@ -36,16 +49,24 @@ export default function App() {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(rounds));
   }, [rounds]);
 
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_COURSES, JSON.stringify(courses));
+  }, [courses]);
+
   const addRound = (round) => {
     setRounds([round, ...rounds].sort((a, b) => new Date(b.date) - new Date(a.date)));
     setActiveTab('stats');
   };
 
+  const addCourse = (courseConfig) => {
+    setCourses([...courses, courseConfig]);
+  };
+
   const exportToJson = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(rounds, null, 2));
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ rounds, courses }, null, 2));
     const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href",     dataStr);
-    downloadAnchorNode.setAttribute("download", "golf_rounds_export.json");
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "golf_tracker_export.json");
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
@@ -74,7 +95,7 @@ export default function App() {
       </header>
 
       <main className="flex-1 max-w-md mx-auto w-full p-4 space-y-6">
-        {activeTab === 'new' && <NewRoundForm onSave={addRound} rounds={rounds} />}
+        {activeTab === 'new' && <NewRoundWrapper courses={courses} onSaveRound={addRound} onSaveCourse={addCourse} />}
         {activeTab === 'stats' && <StatsDashboard rounds={rounds} />}
         {activeTab === 'history' && <History rounds={rounds} />}
       </main>
@@ -82,24 +103,9 @@ export default function App() {
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-800 z-50">
         <div className="max-w-md mx-auto flex justify-around p-2">
-          <NavButton 
-            icon={<Plus className="w-6 h-6" />} 
-            label="New" 
-            active={activeTab === 'new'} 
-            onClick={() => setActiveTab('new')} 
-          />
-          <NavButton 
-            icon={<Activity className="w-6 h-6" />} 
-            label="Stats" 
-            active={activeTab === 'stats'} 
-            onClick={() => setActiveTab('stats')} 
-          />
-          <NavButton 
-            icon={<List className="w-6 h-6" />} 
-            label="History" 
-            active={activeTab === 'history'} 
-            onClick={() => setActiveTab('history')} 
-          />
+          <NavButton icon={<Plus className="w-6 h-6" />} label="New" active={activeTab === 'new'} onClick={() => setActiveTab('new')} />
+          <NavButton icon={<Activity className="w-6 h-6" />} label="Stats" active={activeTab === 'stats'} onClick={() => setActiveTab('stats')} />
+          <NavButton icon={<List className="w-6 h-6" />} label="History" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />
         </div>
       </nav>
     </div>
@@ -108,82 +114,39 @@ export default function App() {
 
 function NavButton({ icon, label, active, onClick }) {
   return (
-    <button 
-      onClick={onClick}
-      className={`flex flex-col items-center p-2 rounded-xl transition-all duration-200 ${
-        active 
-          ? 'text-[#006747] scale-105' 
-          : 'text-slate-500 hover:text-slate-300'
-      }`}
-    >
-      <div className={`${active ? 'bg-[#006747]/10' : ''} p-1.5 rounded-lg mb-1 transition-colors duration-200`}>
-        {icon}
-      </div>
+    <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-xl transition-all duration-200 ${ active ? 'text-[#006747] scale-105' : 'text-slate-500 hover:text-slate-300' }`}>
+      <div className={`${active ? 'bg-[#006747]/10' : ''} p-1.5 rounded-lg mb-1 transition-colors duration-200`}>{icon}</div>
       <span className="text-[10px] font-medium uppercase tracking-wider">{label}</span>
     </button>
   );
 }
 
-function NewRoundForm({ onSave, rounds }) {
+function NewRoundWrapper({ courses, onSaveRound, onSaveCourse }) {
   const [courseName, setCourseName] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [score, setScore] = useState(85);
-  const [putts, setPutts] = useState(36);
-  
-  // Extract unique courses from previous rounds
-  const pastCourses = Array.from(new Set(rounds.map(r => r.courseName)));
-  const defaultCourses = ['Pleasantville Country Club', 'Walkill Golf Club', 'Augusta National', 'Pebble Beach', 'St Andrews', 'Pinehurst No. 2', 'Bethpage Black', 'TPC Sawgrass', 'Torrey Pines', 'Oakmont'];
-  const allCourses = Array.from(new Set([...pastCourses, ...defaultCourses]));
-  
-  // Fairways out of 14, GIR out of 18 (using simple steppers with +/-)
-  // Re-interpreting "toggle switches" to actual UI elements! 
-  // Let's use simple toggles for the 18 holes!
-  const [fairways, setFairways] = useState(Array(18).fill(false));
-  const [girs, setGirs] = useState(Array(18).fill(false));
+  const [configuringCourse, setConfiguringCourse] = useState(false);
 
-  const toggleFairway = (index) => {
-    const newF = [...fairways];
-    newF[index] = !newF[index];
-    setFairways(newF);
-  };
+  const matchedCourse = courses.find(c => c.name.toLowerCase() === courseName.toLowerCase());
 
-  const toggleGir = (index) => {
-    const newG = [...girs];
-    newG[index] = !newG[index];
-    setGirs(newG);
-  };
-
-  const handleSave = () => {
-    if (!courseName) {
-      alert("Please enter a course name");
-      return;
-    }
-    const fairwaysHit = fairways.filter(Boolean).length;
-    const girsHit = girs.filter(Boolean).length;
-    
-    onSave({
-      id: Date.now().toString(),
-      courseName,
-      date,
-      score,
-      putts,
-      fairwaysHit,
-      girsHit,
-    });
-    
-    // Reset form
-    setCourseName('');
-    setScore(85);
-    setPutts(36);
-    setFairways(Array(18).fill(false));
-    setGirs(Array(18).fill(false));
-  };
+  // Show Add Course form if they are explicitly configuring
+  if (configuringCourse) {
+    return (
+      <AddCourseForm 
+        initialName={courseName} 
+        onCancel={() => setConfiguringCourse(false)}
+        onSave={(c) => {
+          onSaveCourse(c);
+          setCourseName(c.name);
+          setConfiguringCourse(false);
+        }} 
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300 fade-in">
       <div className="bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-800 space-y-6">
         
-        {/* Course & Date */}
         <div className="space-y-4">
           <div className="relative">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course Name</label>
@@ -193,23 +156,30 @@ function NewRoundForm({ onSave, rounds }) {
                 type="text" 
                 value={courseName}
                 onChange={(e) => setCourseName(e.target.value)}
-                placeholder="Search or enter course..."
+                placeholder="Search or add course..."
                 className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#006747] focus:border-transparent transition-all placeholder:text-slate-600"
               />
             </div>
+            
             {/* Searchable Dropdown List */}
-            {courseName.length > 0 && (
-              <div className="absolute z-20 w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto">
-                {allCourses.filter(c => c.toLowerCase().includes(courseName.toLowerCase()) && c !== courseName).map(course => (
-                  <button
-                    key={course}
-                    onClick={() => setCourseName(course)}
-                    className="w-full text-left px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors border-b border-slate-800/50 last:border-0"
-                  >
-                    {course}
-                  </button>
-                ))}
-              </div>
+            {courseName.length > 0 && !matchedCourse && (
+               <div className="absolute z-20 w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden max-h-56 overflow-y-auto">
+                 {courses.filter(c => c.name.toLowerCase().includes(courseName.toLowerCase())).map(course => (
+                   <button
+                     key={course.name}
+                     onClick={() => setCourseName(course.name)}
+                     className="w-full text-left px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors border-b border-slate-800/50"
+                   >
+                     {course.name}
+                   </button>
+                 ))}
+                 <button
+                   onClick={() => setConfiguringCourse(true)}
+                   className="w-full text-left px-4 py-3 text-[#006747] font-semibold hover:bg-slate-800 transition-colors flex items-center gap-2"
+                 >
+                   <Plus className="w-4 h-4" /> Add "{courseName}" to Registry
+                 </button>
+               </div>
             )}
           </div>
 
@@ -227,98 +197,210 @@ function NewRoundForm({ onSave, rounds }) {
           </div>
         </div>
 
-        <div className="h-px bg-slate-800 w-full" />
-
-        {/* Score & Putts Steppers */}
-        <div className="grid grid-cols-2 gap-4">
-          <Stepper label="Total Score" value={score} setValue={setScore} icon={<Trophy className="w-4 h-4 text-[#006747]" />} />
-          <Stepper label="Total Putts" value={putts} setValue={setPutts} />
-        </div>
-
-        <div className="h-px bg-slate-800 w-full" />
-
-        {/* Fairways & GIRs Toggles */}
-        <div className="space-y-5">
-          <div>
-            <div className="flex justify-between items-end mb-3">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Fairways Hit</label>
-              <span className="text-lg font-bold text-white">{fairways.filter(Boolean).length}<span className="text-slate-500 text-sm font-normal">/14</span></span>
-            </div>
-            <div className="grid grid-cols-6 gap-2">
-              {fairways.map((hit, i) => (
-                i < 14 ? ( // Only 14 fairways typically
-                  <button 
-                    key={`fw-${i}`}
-                    onClick={() => toggleFairway(i)}
-                    className={`h-10 rounded-lg text-xs font-bold transition-all duration-200 border ${
-                      hit 
-                        ? 'bg-[#006747]/20 border-[#006747] text-[#006747] shadow-[0_0_10px_rgba(0,103,71,0.2)]' 
-                        : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                    }`}
-                  >
-                    {i+1}
-                  </button>
-                ) : null
-              ))}
-            </div>
+        {matchedCourse ? (
+          <HoleByHoleTracker course={matchedCourse} date={date} onSaveRound={onSaveRound} />
+        ) : (
+          <div className="text-center p-6 border-2 border-dashed border-slate-800 rounded-2xl bg-slate-950/50 text-slate-500">
+            <MapPin className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">Select or add a course to start tracking your holes.</p>
           </div>
-
-          <div>
-            <div className="flex justify-between items-end mb-3">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">GIR (Greens In Regulation)</label>
-              <span className="text-lg font-bold text-white">{girs.filter(Boolean).length}<span className="text-slate-500 text-sm font-normal">/18</span></span>
-            </div>
-            <div className="grid grid-cols-6 gap-2">
-              {girs.map((hit, i) => (
-                <button 
-                  key={`gir-${i}`}
-                  onClick={() => toggleGir(i)}
-                  className={`h-10 rounded-lg text-xs font-bold transition-all duration-200 border ${
-                    hit 
-                      ? 'bg-[#006747] border-[#006747] text-white shadow-[0_0_10px_rgba(0,103,71,0.4)]' 
-                      : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
-                  }`}
-                >
-                  {i+1}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <button 
-          onClick={handleSave}
-          className="w-full bg-[#006747] hover:bg-[#007a54] active:scale-[0.98] transition-all text-white font-bold text-lg py-4 rounded-xl shadow-lg shadow-[#006747]/25 flex items-center justify-center gap-2 mt-4"
-        >
-          <Plus className="w-5 h-5" />
-          Save Round
-        </button>
+        )}
       </div>
     </div>
   );
 }
 
-function Stepper({ label, value, setValue, icon }) {
+function AddCourseForm({ initialName, onSave, onCancel }) {
+  const [name, setName] = useState(initialName);
+  const [pars, setPars] = useState(Array(18).fill(4)); // default all par 4s
+
+  const handleParChange = (index, delta) => {
+    const newPars = [...pars];
+    newPars[index] = Math.max(3, Math.min(6, newPars[index] + delta)); // restrict between Par 3 and Par 6
+    setPars(newPars);
+  };
+
   return (
-    <div className="bg-slate-950 rounded-2xl p-3 border border-slate-800 flex flex-col items-center shadow-inner">
-      <div className="flex items-center gap-1.5 mb-2">
-        {icon}
-        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</span>
+    <div className="bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-800 space-y-6 animate-in slide-in-from-right-4 duration-300">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <MapPin className="w-5 h-5 text-[#006747]" />
+          Configure Course
+        </h2>
+        <button onClick={onCancel} className="text-slate-500 hover:text-white text-sm font-semibold">Cancel</button>
       </div>
-      <div className="flex items-center justify-between w-full">
-        <button 
-          onClick={() => setValue(v => Math.max(0, v - 1))}
-          className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 active:bg-slate-800 transition-colors"
-        >
-          <Minus className="w-5 h-5" />
-        </button>
-        <span className="text-3xl font-black tabular-nums tracking-tighter">{value}</span>
-        <button 
-          onClick={() => setValue(v => v + 1)}
-          className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 active:bg-slate-800 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-        </button>
+
+      <div>
+        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Club Name</label>
+        <input 
+          type="text" 
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#006747] focus:border-transparent transition-all"
+        />
+      </div>
+
+      <div className="space-y-3">
+        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Set Pars (Hole 1 - 18)</label>
+        <div className="grid grid-cols-3 gap-2">
+          {pars.map((par, i) => (
+            <div key={i} className="bg-slate-950 border border-slate-800 rounded-xl p-2 flex flex-col items-center">
+              <span className="text-[10px] text-slate-500 font-bold mb-1">Hole {i + 1}</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => handleParChange(i, -1)} className="p-1 text-slate-400 hover:text-white bg-slate-900 rounded-md"><Minus className="w-3 h-3" /></button>
+                <span className="font-bold text-sm w-3 text-center">{par}</span>
+                <button onClick={() => handleParChange(i, 1)} className="p-1 text-slate-400 hover:text-white bg-slate-900 rounded-md"><Plus className="w-3 h-3" /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
+        <span className="text-sm font-semibold text-slate-400">Total Course Par:</span>
+        <span className="text-2xl font-black text-white">{pars.reduce((a,b)=>a+b,0)}</span>
+      </div>
+
+      <button 
+        onClick={() => onSave({ name, pars })}
+        className="w-full bg-[#006747] hover:bg-[#007a54] text-white font-bold text-lg py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+      >
+        <Check className="w-5 h-5" />
+        Save Configuration
+      </button>
+    </div>
+  );
+}
+
+function HoleByHoleTracker({ course, date, onSaveRound }) {
+  // Initialize hole data based on the course pars
+  const [holes, setHoles] = useState(
+    course.pars.map((par) => ({
+      par: par,
+      shots: par, // default to par
+      putts: 2,   // default 2 putts
+      fairway: par > 3 ? true : null, // par 3s don't have fairways typically
+      gir: true,  // default to hitting the green
+    }))
+  );
+
+  const updateHole = (index, field, value) => {
+    const newHoles = [...holes];
+    newHoles[index] = { ...newHoles[index], [field]: value };
+    setHoles(newHoles);
+  };
+
+  const handleSave = () => {
+    // Derive totals
+    const score = holes.reduce((sum, h) => sum + h.shots, 0);
+    const putts = holes.reduce((sum, h) => sum + h.putts, 0);
+    const fairwaysHit = holes.filter(h => h.fairway === true).length;
+    const girsHit = holes.filter(h => h.gir === true).length;
+
+    onSaveRound({
+      id: Date.now().toString(),
+      courseName: course.name,
+      date,
+      score,
+      putts,
+      fairwaysHit,
+      girsHit,
+      holeData: holes // Save granular data for future if requested!
+    });
+  };
+
+  return (
+    <div className="space-y-6 pt-4 border-t border-slate-800">
+      
+      {/* Sticky header for current totals */}
+      <div className="sticky top-20 z-10 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl p-4 shadow-lg flex justify-between items-center">
+        <div>
+          <div className="text-[10px] uppercase font-bold text-slate-400">Total Score</div>
+          <div className="text-2xl font-black text-[#006747] leading-none">{holes.reduce((a,b)=>a+b.shots, 0)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase font-bold text-slate-400 text-right">To Par</div>
+          <div className="text-xl font-bold text-white leading-none">
+            {holes.reduce((a,b)=>a+b.shots, 0) - course.pars.reduce((a,b)=>a+b, 0) > 0 ? '+' : ''}{holes.reduce((a,b)=>a+b.shots, 0) - course.pars.reduce((a,b)=>a+b, 0)}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {holes.map((hole, i) => (
+          <div key={i} className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-inner">
+            <div className="bg-slate-900 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
+              <span className="font-bold text-sm text-white flex items-center gap-2">
+                <Flag className="w-3 h-3 text-[#006747]" /> Hole {i + 1}
+              </span>
+              <span className="text-xs font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">Par {hole.par}</span>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <CompactStepper 
+                  label="Shots" 
+                  value={hole.shots} 
+                  onChange={(val) => updateHole(i, 'shots', val)} 
+                  highlight={hole.shots < hole.par ? 'text-green-400' : hole.shots > hole.par ? 'text-red-400' : 'text-white'}
+                />
+                <CompactStepper 
+                  label="Putts" 
+                  value={hole.putts} 
+                  onChange={(val) => updateHole(i, 'putts', Math.max(0, val))} 
+                />
+              </div>
+
+              <div className="flex gap-2">
+                {hole.par > 3 ? (
+                  <button 
+                    onClick={() => updateHole(i, 'fairway', !hole.fairway)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center gap-1 ${
+                      hole.fairway ? 'bg-[#006747]/20 border-[#006747] text-[#006747]' : 'bg-slate-900 border-slate-800 text-slate-500'
+                    }`}
+                  >
+                    Fairway {hole.fairway && <Check className="w-3 h-3" />}
+                  </button>
+                ) : (
+                  <div className="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-900/50 border border-slate-800/50 text-slate-600 flex items-center justify-center">
+                    N/A (Par 3)
+                  </div>
+                )}
+                
+                <button 
+                  onClick={() => updateHole(i, 'gir', !hole.gir)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center gap-1 ${
+                    hole.gir ? 'bg-[#006747] border-[#006747] text-white' : 'bg-slate-900 border-slate-800 text-slate-500'
+                  }`}
+                >
+                  GIR {hole.gir && <Check className="w-3 h-3" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button 
+        onClick={handleSave}
+        className="w-full bg-[#006747] hover:bg-[#007a54] text-white font-bold text-lg py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all relative z-10"
+      >
+        <Trophy className="w-5 h-5" />
+        Finish & Save Round
+      </button>
+
+    </div>
+  );
+}
+
+function CompactStepper({ label, value, onChange, highlight = "text-white" }) {
+  return (
+    <div className="flex flex-col items-center bg-slate-900 border border-slate-800 rounded-xl p-2">
+      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">{label}</span>
+      <div className="flex items-center justify-between w-full px-2">
+        <button onClick={() => onChange(value - 1)} className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 flex items-center justify-center active:bg-slate-800 border border-slate-800"><Minus className="w-4 h-4" /></button>
+        <span className={`text-xl font-black ${highlight}`}>{value}</span>
+        <button onClick={() => onChange(value + 1)} className="w-8 h-8 rounded-full bg-slate-950 text-slate-400 flex items-center justify-center active:bg-slate-800 border border-slate-800"><Plus className="w-4 h-4" /></button>
       </div>
     </div>
   );
@@ -343,6 +425,7 @@ function StatsDashboard({ rounds }) {
   const totalGirs = rounds.reduce((sum, r) => sum + r.girsHit, 0);
   const girPercentage = ((totalGirs / (rounds.length * 18)) * 100).toFixed(1);
 
+  // Note: Total fairways varies per course, but typically 14
   const totalFairways = rounds.reduce((sum, r) => sum + r.fairwaysHit, 0);
   const fairwayPercentage = ((totalFairways / (rounds.length * 14)) * 100).toFixed(1);
 
@@ -351,7 +434,6 @@ function StatsDashboard({ rounds }) {
       
       {/* Main Stat Card */}
       <div className="bg-gradient-to-br from-[#006747] to-[#004d35] rounded-3xl p-6 shadow-xl relative overflow-hidden">
-        {/* Decorative background element */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/4" />
         
         <h2 className="text-sm font-bold text-white/80 uppercase tracking-widest mb-1">Average Score</h2>
